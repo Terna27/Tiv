@@ -47,9 +47,9 @@ coverage.xml
 *.pem
 *.key
 
-# Local Data Storage & Quarantine
-.storage/
-storage/
+# Local Data Storage & Quarantine (Anchored to root to avoid ignoring app/storage code)
+/.storage/
+/storage/
 *.sqlite3
 *.db
 

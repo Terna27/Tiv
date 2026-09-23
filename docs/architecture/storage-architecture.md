@@ -54,83 +54,68 @@ storage-root/
 
 ---
 
-## 3. Storage Abstraction Interface Contract
+## 3. Storage Abstraction Interface Contract (Implemented in Milestone 2)
 
-Developer 3 provides a clean Python interface contract. Developer 1 and the data processing pipeline call these conceptual operations:
+Developer 3 provides a production-grade Python storage abstraction package under `app.storage`. Developer 1 and the data processing pipeline call these verified operations:
 
 ```python
-from abc import ABC, abstractmethod
-from typing import BinaryIO, Optional, Dict, Any
-from dataclasses import dataclass
-from datetime import datetime
+from app.storage import (
+    StorageBackend,
+    StoredObject,
+    LocalStorageBackend,
+    get_storage,
+    generate_raw_audio_key,
+    generate_processed_audio_key,
+    generate_quarantine_key,
+    generate_export_key,
+    ObjectAlreadyExistsError,
+    ObjectNotFoundError,
+    PathTraversalError,
+)
 
-@dataclass(frozen=True)
-class StorageMetadata:
-    key: str
-    size_bytes: int
-    content_type: str
-    sha256_checksum: str
-    created_at: datetime
-    custom_metadata: Dict[str, str]
+# 1. Obtain storage backend via central factory / dependency injection
+storage: StorageBackend = get_storage()
 
-class StorageBackend(ABC):
-    """Abstract interface contract for storage operations across Tiv AI environments."""
+# 2. Generate a secure, collision-resistant, date-partitioned storage key
+key = generate_raw_audio_key(submission_id="sub_01h8q7j4", content_hash="a1b2c3d4e5f6", extension="webm")
+# Output: "raw/audio/2026/09/23/sub_01h8q7j4_a1b2c3d4.webm"
 
-    @abstractmethod
-    def save(
-        self,
-        key: str,
-        data: BinaryIO,
-        content_type: str,
-        metadata: Optional[Dict[str, str]] = None,
-    ) -> StorageMetadata:
-        """Persist a binary data stream to the given key.
-        
-        Must raise an error if key already exists in an immutable namespace (raw/).
-        """
-        pass
+# 3. Atomically persist binary stream or bytes
+stored_obj: StoredObject = storage.save(
+    key=key,
+    data=audio_stream,
+    content_type="audio/webm",
+    metadata={"contributor_id": "contrib_987", "dialect": "Central Tiv"},
+)
+print(f"Saved {stored_obj.size_bytes} bytes with SHA-256: {stored_obj.checksum_sha256}")
 
-    @abstractmethod
-    def open_read(self, key: str) -> BinaryIO:
-        """Open a read-only binary stream for the specified key.
-        
-        Raises FileNotFoundError if key does not exist.
-        """
-        pass
+# 4. Stream or read data
+data_bytes = storage.read_bytes(key)
+for chunk in storage.stream(key, chunk_size=65536):
+    process_audio_chunk(chunk)
 
-    @abstractmethod
-    def exists(self, key: str) -> bool:
-        """Check whether an object exists at the specified key."""
-        pass
-
-    @abstractmethod
-    def delete(self, key: str) -> bool:
-        """Delete the object at the specified key.
-        
-        Strictly restricted: Only permissible for quarantine cleanup or legal consent withdrawal.
-        """
-        pass
-
-    @abstractmethod
-    def get_metadata(self, key: str) -> StorageMetadata:
-        """Retrieve technical metadata and checksum for the specified key."""
-        pass
-
-    @abstractmethod
-    def generate_presigned_url(self, key: str, expires_in_seconds: int = 900) -> str:
-        """Generate a time-limited URL for secure authenticated client playback."""
-        pass
+# 5. Query existence or retrieve metadata without full-body read
+if storage.exists(key):
+    meta: StoredObject = storage.get_metadata(key)
 ```
 
 ### Implementations:
-1. **`LocalStorageBackend`**:
+1. **`LocalStorageBackend` (`app/storage/local.py`)**:
    - Backed by local directory (`.storage/` in project root).
-   - Generates local file URLs or streams via FastAPI proxy endpoints (`/api/v1/media/{key}`).
-   - Used for unit tests, offline development, and zero-dependency local runs.
-2. **`S3StorageBackend`**:
-   - Backed by AWS S3, Cloudflare R2, MinIO, or Google Cloud Storage.
+   - Atomic writes via staging directory (`.storage/.tmp/`) and POSIX `os.replace`.
+   - Path traversal guard guarantees no storage key can escape `root_dir`.
+   - Strict immutability: Rejects overwriting any key in `raw/` with `ObjectAlreadyExistsError`.
+   - On-the-fly streaming SHA-256 calculation.
+2. **`S3StorageBackend` (Future Cloud Production Milestone)**:
+   - Plugs in via `STORAGE_BACKEND=s3` using the identical `StorageBackend` contract.
    - Generates AWS SigV4 signed presigned GET URLs for secure, direct browser streaming.
-   - Used for cloud staging and production deployments.
+   - Application business logic remains 100% unchanged.
+
+### Running Storage Tests:
+```bash
+# Run unit and integration storage test suites
+pytest tests/test_storage.py tests/test_storage_integration.py -v
+```
 
 ---
 
