@@ -1,0 +1,9 @@
+# Database Migrations (Developer 1 & Alembic)
+
+This directory contains database schema migration scripts managed by Alembic.
+
+## Commands
+* Run all pending migrations: `alembic upgrade head`
+* View current migration status: `alembic current`
+* Check migration history: `alembic history`
+* Generate new migration: `alembic revision --autogenerate -m "description"`

@@ -80,6 +80,9 @@ All technical specifications, API contracts, standards, and decision records are
 - [**ADR 0004: Checksum-Based Exact Duplicate Detection for MVP**](file:///home/recoding/Tiv/docs/adr/0004-checksum-based-exact-duplicate-detection.md)
 - [**ADR 0005: Defer AI Model Training Outside Data Collection MVP**](file:///home/recoding/Tiv/docs/adr/0005-defer-ai-training-outside-data-collection-mvp.md)
 
+### 3.5 Development Guides
+- [**Local Development Environment Guide**](file:///home/recoding/Tiv/docs/development/local-development-guide.md): Complete, verified guide for environment setup, database connectivity, migrations, testing, and troubleshooting.
+
 ---
 
 ## 4. Local Development Quickstart
@@ -87,33 +90,31 @@ All technical specifications, API contracts, standards, and decision records are
 ### Prerequisites
 - Python 3.12+
 - Node.js 20+ and npm 10+
-- PostgreSQL (or local SQLite for lightweight testing)
+- PostgreSQL (or local SQLite for zero-dependency local testing)
+- GNU Make
 
-### Backend Setup (FastAPI)
+### Quickstart (Recommended)
 ```bash
-# 1. Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+# 1. Initialize environment, install dependencies, prepare .env & storage
+make setup
 
-# 2. Install dependencies (once backend requirements are committed)
-pip install -r requirements.txt
+# 2. Run diagnostic health verification
+make verify
 
-# 3. Configure environment
-cp .env.example .env
+# 3. Run automated tests
+make test
 
-# 4. Run database migrations
-alembic upgrade head
-
-# 5. Start development server
-uvicorn app.main:app --reload --port 8000
+# 4. Start backend on http://127.0.0.1:8000
+make run-backend
 ```
 
-### Frontend Setup (React + Vite)
+### In a separate terminal (Frontend):
 ```bash
-# Developer 2 frontend workspace
-unzip -q tiv-ai-frontend.zip -d frontend
-cd frontend
-npm install
-npm run dev
-# Running on http://localhost:5173
+# 1. Unpack frontend and install packages
+make frontend-setup
+
+# 2. Start Vite dev server on http://localhost:5173
+make frontend-dev
 ```
+
+For complete details, database options, and troubleshooting, see the [Local Development Environment Guide](file:///home/recoding/Tiv/docs/development/local-development-guide.md).
